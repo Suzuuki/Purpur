@@ -1,0 +1,91 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: suzuki <kotick.pvp@gmail.com>
+Date: Wed, 3 Jul 2024 21:41:35 +0300
+Subject: [PATCH] add rcon command
+
+
+diff --git a/src/main/java/io/papermc/paper/command/PaperCommands.java b/src/main/java/io/papermc/paper/command/PaperCommands.java
+index 7b58b2d6297800c2dcdbf7539e5ab8e7703f39f1..b46e8602e09930da02fb284b951e2b23e3bac2e2 100644
+--- a/src/main/java/io/papermc/paper/command/PaperCommands.java
++++ b/src/main/java/io/papermc/paper/command/PaperCommands.java
+@@ -19,6 +19,7 @@ public final class PaperCommands {
+         COMMANDS.put("paper", new PaperCommand("paper"));
+         COMMANDS.put("callback", new CallbackCommand("callback"));
+         COMMANDS.put("mspt", new MSPTCommand("mspt"));
++        COMMANDS.put("reloadrcon", new ReloadRCONCommand("reloadrcon"));
+     }
+ 
+     public static void registerCommands(final MinecraftServer server) {
+diff --git a/src/main/java/io/papermc/paper/command/ReloadRCONCommand.java b/src/main/java/io/papermc/paper/command/ReloadRCONCommand.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b52e03b4e755e40c4547db92a33e85b19e2ff51d
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/command/ReloadRCONCommand.java
+@@ -0,0 +1,54 @@
++package io.papermc.paper.command;
++
++import net.kyori.adventure.text.Component;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.dedicated.DedicatedServer;
++import net.minecraft.server.rcon.thread.RconThread;
++import org.bukkit.Location;
++import org.bukkit.command.Command;
++import org.bukkit.command.CommandSender;
++import java.util.Collections;
++import java.util.List;
++
++public class ReloadRCONCommand extends Command {
++
++    public ReloadRCONCommand(final String name) {
++        super(name);
++        this.description = "Try to reload RCON";
++        this.usageMessage = "/reloadrcon";
++        this.setPermission("bukkit.command.reloadrcon");
++    }
++
++    @Override
++    public List<String> tabComplete(CommandSender sender, String alias, String[] args, Location location) throws IllegalArgumentException {
++        return Collections.emptyList();
++    }
++
++    @Override
++    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
++        if (!testPermission(sender)) return true;
++        MinecraftServer server = MinecraftServer.getServer();
++
++        if (!(server instanceof DedicatedServer ds)) {
++            sender.sendMessage(Component.text("intanceof check fail"));
++            return true;
++        }
++
++        try {
++            if (ds.rconThread != null)
++                ds.rconThread.stopNonBlocking();
++        } catch (Throwable ignored) {
++        }
++
++        try {
++            ds.rconThread = RconThread.create(ds);
++            sender.sendMessage(Component.text("RCON successfully reloaded"));
++        } catch (Throwable t) {
++            t.printStackTrace();
++            sender.sendMessage(Component.text("Something went wrong"));
++        }
++
++        return true;
++    }
++
++}
+diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+index 39a7abeeff53a608774dc34226e9b5e12bd5b5d2..d2a218876b7d4ab9e6d94b95f5d9a4aa78d0cf23 100644
+--- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -83,7 +83,7 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+     private QueryThreadGs4 queryThreadGs4;
+     // private final RemoteControlCommandListener rconConsoleSource; // CraftBukkit - remove field
+     @Nullable
+-    private RconThread rconThread;
++    public RconThread rconThread;
+     public DedicatedServerSettings settings;
+     @Nullable
+     private MinecraftServerGui gui;
